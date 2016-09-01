@@ -1,0 +1,67 @@
+{
+  "export_cfg": [
+    {
+      "type": "hosts",
+      "method": "host.get",
+      "output": [ "hostid", "name" ],
+      "sortorder": "hostid",
+      "id": "hostid"
+    },
+    {
+      "type": "groups",
+      "method": "hostgroup.get",
+      "output": [ "groupid", "name" ],
+      "sortorder": "groupid",
+      "id": "groupid"
+    },
+    {
+      "type": "valueMaps",
+      "method": "valuemap.get",
+      "output": [ "valuemapid", "name" ],
+      "sortorder": "valuemapid",
+      "id": "valuemapid"
+    },
+    {
+      "type": "templates",
+      "method": "template.get",
+      "output": [ "templateid", "name" ],
+      "sortorder": "templateid",
+      "id": "templateid"
+    },
+    {
+      "type": "images",
+      "method": "image.get",
+      "output": [ "imageids", "name" ],
+      "sortorder": "imageids",
+      "id": "imageids"
+    },
+    {
+      "type": "maps",
+      "method": "map.get",
+      "output": [ "sysmapids", "name" ],
+      "sortorder": "sysmapids",
+      "id": "sysmapids"
+    },
+    {
+      "type": "screens",
+      "method": "screen.get",
+      "output": [ "screenids", "name" ],
+      "sortorder": "screenids",
+      "id": "screenids"
+    }
+  ],
+  "zabbix_cfg": [
+    {
+      "inst": "ZBX-LAB1",
+      "url": "http://localhost/api_jsonrpc.php",
+      "user": "Admin",
+      "password": "zabbix"
+    },
+    {
+      "inst": "ZBX-LAB2",
+      "url": "http://localhost/api_jsonrpc.php",
+      "user": "Admin",
+      "password": "zabbix"
+    }
+  ]
+}

@@ -1,9 +1,10 @@
 require 'logger'
+require 'json'
 require 'fileutils'
 require "zabbixapi"
 require 'git'
 
-$logger = Logger.new('zbx2git.log', 'weekly')
+$logger = Logger.new('zbx2git.log', 'monthly')
 $logger.level = Logger::WARN
 
 
@@ -30,7 +31,7 @@ def exportConfig(inst, zbx, cfg)
     for result in results do
       begin
         # File name normalization
-        file = "#{result["name"]}.json".gsub(/[^a-zA-Z0-9\-_\s\.\(\)]/,"")
+        file = "#{result["name"].gsub(/[^a-zA-Z0-9\-_\s\.\(\)]/,'')}.json"
         $logger.debug "#{path}/#{file}"
 
         json = JSON.parse(zbx.query(
@@ -50,7 +51,7 @@ def exportConfig(inst, zbx, cfg)
         FileUtils.mkdir_p(path) unless File.exists?(path)
         File.open("#{path}/#{file}","w"){|f| f.puts json_pretty}
       rescue Exception => e
-        $logger.error "Error Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
+        $logger.error "Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
         $logger.debug "Trace: #{e.backtrace.inspect}"
       end
     end
@@ -68,80 +69,41 @@ def exportConfig(inst, zbx, cfg)
         $logger.info "Git (Change): #{m}" if m != nil
       end
     rescue Exception => e
-       $logger.error "Error saving changes to git: #{cfg[:type]} (#{inst}) : #{e.message}"
+       $logger.error "Saving changes to git: #{cfg[:type]} (#{inst}) : #{e.message}"
     end
 
     $logger.warn "Finished Exporting: #{cfg[:type]} (#{inst}) in #{secs2human(Time.now.to_i - ts_s)}"
   rescue Exception => e
-    $logger.error "Error Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
+    $logger.error "Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
     $logger.debug "Trace: #{e.backtrace.inspect}"
   end
 end
 
 
-@export_cfg = [{ :type => :hosts,
-                 :method => "host.get",
-                 :output => ["hostid","name"],
-                 :sortorder => "hostid",
-                 :id => "hostid"
-               },
-               { :type => :groups,
-                 :method => "hostgroup.get",
-                 :output => ["groupid","name"],
-                 :sortorder => "groupid",
-                 :id => "groupid"
-               },
-               { :type => :valueMaps,
-                 :method => "valuemap.get",
-                 :output => ["valuemapid","name"],
-                 :sortorder => "valuemapid",
-                 :id => "valuemapid"
-               },
-               { :type => :templates,
-                 :method => "template.get",
-                 :output => ["templateid","name"],
-                 :sortorder => "templateid",
-                 :id => "templateid"
-               },
-               { :type => :images,
-                 :method => "image.get",
-                 :output => ["imageids","name"],
-                 :sortorder => "imageids",
-                 :id => "imageids"
-               },
-               { :type => :maps,
-                 :method => "map.get",
-                 :output => ["sysmapids","name"],
-                 :sortorder => "sysmapids",
-                 :id => "sysmapids"
-               },
-               { :type => :screens,
-                 :method => "screen.get",
-                 :output => ["screenids","name"],
-                 :sortorder => "screenids",
-                 :id => "screenids"
-               }
-              ]
 
-@zabbix_cfg = [{ :inst => "PDC-LAB",
-                 :url => "http://localhost/api_jsonrpc.php",
-                 :user => "Admin",
-                 :password => "zabbix",
-               }]
 
-for zab_cfg in @zabbix_cfg do
+
+begin
+  cfg = JSON.parse(File.read('zbx2git.json'), :symbolize_names => true)
+rescue Exception => e
+  $logger.error "Loading config file: zbx2git.json : #{e.message}"
+  $logger.debug "Trace: #{e.backtrace.inspect}"
+  exit 1
+end
+
+for zab_cfg in cfg[:zabbix_cfg] do
   begin
      ts_s = Time.now.to_i
      $logger.warn "Start Collecting: #{zab_cfg[:inst]}"
      zbx = ZabbixApi.connect(:url => zab_cfg[:url], :user => zab_cfg[:user], :password => zab_cfg[:password])
 
-     for exp_cfg in @export_cfg do
+     for exp_cfg in cfg[:export_cfg] do
        exportConfig(zab_cfg[:inst], zbx, exp_cfg)
      end
      $logger.warn "Finished Collecting: #{zab_cfg[:inst]} in #{secs2human(Time.now.to_i - ts_s)}"
 
   rescue Exception => e
-    $logger.error "Error Connecting to Zabbix: #{zab_cfg[:inst]} : #{e.message}"
+    $logger.error "Connecting to Zabbix: #{zab_cfg[:inst]} : #{e.message}"
     $logger.debug "Trace: #{e.backtrace.inspect}"
   end
 end
