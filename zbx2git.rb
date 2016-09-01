@@ -3,9 +3,9 @@ require 'fileutils'
 require "zabbixapi"
 require 'git'
 
+$logger = Logger.new('zbx2git.log', 'weekly')
+$logger.level = Logger::WARN
 
-logger = Logger.new('test.log', 'weekly')
-logger.level = Logger::WARN
 
 def secs2human(secs)
   [[60, :seconds], [60, :minutes], [24, :hours], [1000, :days]].map{|count, name|
@@ -19,20 +19,19 @@ end
 def exportConfig(inst, zbx, cfg)
   begin
     ts_s = Time.now.to_i
-    puts "> Start Exporting: #{cfg[:type]} (#{inst})"
+    $logger.warn "Start Exporting: #{cfg[:type]} (#{inst})"
 
     results = zbx.query(
       :method => cfg[:method],
       :params => {:output => cfg[:output], :sortorder => cfg[:sortorder]}
     )
 
-    path = Dir.pwd()+"/#{inst}/#{cfg[:type]}"
+    path = "#{Dir.pwd()}/#{inst}/#{cfg[:type]}"
     for result in results do
       begin
-        #puts JSON.pretty_generate(result)
-        # Fime name normalization
-        file = result["name"]+".json".gsub(/[^a-zA-Z0-9\-_\s\.\(\)]/,"")
-        #printf " '%s/%s'\n", path, file
+        # File name normalization
+        file = "#{result["name"]}.json".gsub(/[^a-zA-Z0-9\-_\s\.\(\)]/,"")
+        $logger.debug "#{path}/#{file}"
 
         json = JSON.parse(zbx.query(
           :method => "configuration.export",
@@ -44,36 +43,38 @@ def exportConfig(inst, zbx, cfg)
           }
         ))
 
-        # Clear export data to prevent unnecessary changes
+        # Clear export date to prevent unnecessary git changes
         json["zabbix_export"]["date"] = ""
         json_pretty = JSON.pretty_generate(json)
 
         FileUtils.mkdir_p(path) unless File.exists?(path)
         File.open("#{path}/#{file}","w"){|f| f.puts json_pretty}
       rescue Exception => e
-        logger.error "Error Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
+        $logger.error "Error Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
+        $logger.debug "Trace: #{e.backtrace.inspect}"
       end
     end
 
     begin
-      if !File.exists?(path+"/.git")
-        g = Git.init(path)
+      if !File.exists?("#{path}/.git")
+        g = Git.init(path, :log => $logger)
         g.add(:all=>true)
         m = g.commit_all('Initial')
-        puts "> Git (Init): #{m}" if m != nil
+        $logger.info "Git (Init): #{m}" if m != nil
       else
-        g = Git.open(path)
+        g = Git.open(path, :log => $logger)
         g.add(:all=>true)
         m = g.commit_all('Change') if !g.status.changed.empty?
-        puts "> Git (Change): #{m}" if m != nil
+        $logger.info "Git (Change): #{m}" if m != nil
       end
     rescue Exception => e
-       logger.error "Error saving changes to git: #{cfg[:type]} (#{inst}) : #{e.message}"
+       $logger.error "Error saving changes to git: #{cfg[:type]} (#{inst}) : #{e.message}"
     end
 
-    puts "> Finished Exporting: #{cfg[:type]} (#{inst}) in #{secs2human(Time.now.to_i - ts_s)}"
+    $logger.warn "Finished Exporting: #{cfg[:type]} (#{inst}) in #{secs2human(Time.now.to_i - ts_s)}"
   rescue Exception => e
-    logger.error "Error Exporting: #{cfg[:type]} (#{inst}) : #{e.message} : #{e.backtrace.inspect}"
+    $logger.error "Error Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
+    $logger.debug "Trace: #{e.backtrace.inspect}"
   end
 end
 
@@ -131,16 +132,17 @@ end
 for zab_cfg in @zabbix_cfg do
   begin
      ts_s = Time.now.to_i
-     puts "> Start Collecting: #{zab_cfg[:inst]}"
+     $logger.warn "Start Collecting: #{zab_cfg[:inst]}"
      zbx = ZabbixApi.connect(:url => zab_cfg[:url], :user => zab_cfg[:user], :password => zab_cfg[:password])
 
      for exp_cfg in @export_cfg do
        exportConfig(zab_cfg[:inst], zbx, exp_cfg)
      end
-     puts "> Finished Collecting: #{zab_cfg[:inst]} in #{secs2human(Time.now.to_i - ts_s)}"
+     $logger.warn "Finished Collecting: #{zab_cfg[:inst]} in #{secs2human(Time.now.to_i - ts_s)}"
 
   rescue Exception => e
-    logger.error "Error Connecting to Zabbix: #{zab_cfg[:inst]} : #{e.message}"
+    $logger.error "Error Connecting to Zabbix: #{zab_cfg[:inst]} : #{e.message}"
+    $logger.debug "Trace: #{e.backtrace.inspect}"
   end
 end
 
