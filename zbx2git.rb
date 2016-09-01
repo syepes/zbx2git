@@ -1,11 +1,9 @@
 require 'logger'
 require 'json'
+require 'parallel'
 require 'fileutils'
 require "zabbixapi"
 require 'git'
-
-$logger = Logger.new('zbx2git.log', 'monthly')
-$logger.level = Logger::WARN
 
 
 def secs2human(secs)
@@ -17,10 +15,10 @@ def secs2human(secs)
   }.compact.reverse.join(' ')
 end
 
-def exportConfig(inst, zbx, cfg)
+def exportConfig(logger, inst, zbx, cfg)
   begin
     ts_s = Time.now.to_i
-    $logger.warn "Start Exporting: #{cfg[:type]} (#{inst})"
+    logger.warn "Start Exporting: #{cfg[:type]} (#{inst})"
 
     results = zbx.query(
       :method => cfg[:method],
@@ -32,7 +30,7 @@ def exportConfig(inst, zbx, cfg)
       begin
         # File name normalization
         file = "#{result["name"].gsub(/[^a-zA-Z0-9\-_\s\.\(\)]/,'')}.json"
-        $logger.debug "#{path}/#{file}"
+        logger.debug "#{path}/#{file}"
 
         json = JSON.parse(zbx.query(
           :method => "configuration.export",
@@ -51,31 +49,31 @@ def exportConfig(inst, zbx, cfg)
         FileUtils.mkdir_p(path) unless File.exists?(path)
         File.open("#{path}/#{file}","w"){|f| f.puts json_pretty}
       rescue Exception => e
-        $logger.error "Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
-        $logger.debug "Trace: #{e.backtrace.inspect}"
+        logger.error "Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
+        logger.debug "Trace: #{e.backtrace.inspect}"
       end
     end
 
     begin
       if !File.exists?("#{path}/.git")
-        g = Git.init(path, :log => $logger)
+        g = Git.init(path, :log => logger)
         g.add(:all=>true)
         m = g.commit_all('Initial')
-        $logger.info "Git (Init): #{m}" if m != nil
+        logger.info "Git (Init): #{m}" if m != nil
       else
         g = Git.open(path, :log => $logger)
         g.add(:all=>true)
         m = g.commit_all('Change') if !g.status.changed.empty?
-        $logger.info "Git (Change): #{m}" if m != nil
+        logger.info "Git (Change): #{m}" if m != nil
       end
     rescue Exception => e
-       $logger.error "Saving changes to git: #{cfg[:type]} (#{inst}) : #{e.message}"
+       logger.error "Saving changes to git: #{cfg[:type]} (#{inst}) : #{e.message}"
     end
 
-    $logger.warn "Finished Exporting: #{cfg[:type]} (#{inst}) in #{secs2human(Time.now.to_i - ts_s)}"
+    logger.warn "Finished Exporting: #{cfg[:type]} (#{inst}) in #{secs2human(Time.now.to_i - ts_s)}"
   rescue Exception => e
-    $logger.error "Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
-    $logger.debug "Trace: #{e.backtrace.inspect}"
+    logger.error "Exporting: #{cfg[:type]} (#{inst}) : #{e.message}"
+    logger.debug "Trace: #{e.backtrace.inspect}"
   end
 end
 
@@ -86,25 +84,29 @@ end
 begin
   cfg = JSON.parse(File.read('zbx2git.json'), :symbolize_names => true)
 rescue Exception => e
-  $logger.error "Loading config file: zbx2git.json : #{e.message}"
-  $logger.debug "Trace: #{e.backtrace.inspect}"
+  puts "Error Loading config file: zbx2git.json : #{e.message}"
   exit 1
 end
 
-for zab_cfg in cfg[:zabbix_cfg] do
-  begin
-     ts_s = Time.now.to_i
-     $logger.warn "Start Collecting: #{zab_cfg[:inst]}"
-     zbx = ZabbixApi.connect(:url => zab_cfg[:url], :user => zab_cfg[:user], :password => zab_cfg[:password])
+ts_s = Time.now.to_i
+Parallel.each(cfg[:zabbix_cfg], in_threads: 5) { |zab_cfg|
+  logger = Logger.new("zbx2git_#{zab_cfg[:inst]}.log", 'monthly')
+  logger.level = Logger::WARN
 
-     for exp_cfg in cfg[:export_cfg] do
-       exportConfig(zab_cfg[:inst], zbx, exp_cfg)
-     end
-     $logger.warn "Finished Collecting: #{zab_cfg[:inst]} in #{secs2human(Time.now.to_i - ts_s)}"
+  begin
+    ts_s = Time.now.to_i
+    logger.warn "Start Collecting: #{zab_cfg[:inst]} - #{zab_cfg[:url]}"
+    zbx = ZabbixApi.connect(:url => zab_cfg[:url], :user => zab_cfg[:user], :password => zab_cfg[:password], :timeout => 5)
+
+    for exp_cfg in cfg[:export_cfg] do
+      exportConfig(logger, zab_cfg[:inst], zbx, exp_cfg)
+    end
+    logger.warn "Finished Collecting: #{zab_cfg[:inst]} in #{secs2human(Time.now.to_i - ts_s)}"
 
   rescue Exception => e
-    $logger.error "Connecting to Zabbix: #{zab_cfg[:inst]} : #{e.message}"
-    $logger.debug "Trace: #{e.backtrace.inspect}"
+    logger.error "Connecting to Zabbix: #{zab_cfg[:inst]} : #{e.message}"
+    logger.debug "Trace: #{e.backtrace.inspect}"
   end
-end
+}
+puts "Completed in #{secs2human(Time.now.to_i - ts_s)}"
 
