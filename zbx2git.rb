@@ -1,3 +1,13 @@
+#!/usr/bin/env jruby
+#
+# DESCRIPTION:
+#   Exports your Zabbix configuration and uses Git to store any changes made from the previous runs
+#
+#
+# LICENSE:
+#   Copyright 2016 Sebastian YEPES <syepes@gmail.com>
+#   Released under the Apache License, see LICENSE for details.
+#
 require 'logger'
 require 'json'
 require 'parallel'
@@ -60,6 +70,7 @@ def exportConfig(logger, inst, zbx, cfg)
         g.add(:all=>true)
         m = g.commit_all('Initial')
         logger.info "Git (Init): #{m}" if m != nil
+        File.open("#{path}/.git/description","w"){|f| f.puts "#{inst} - #{cfg[:type]}"}
       else
         g = Git.open(path, :log => $logger)
         g.add(:all=>true)
@@ -80,13 +91,19 @@ end
 
 
 
+logger = Logger.new("zbx2git.log", 'monthly')
+logger.level = Logger::WARN
 
 begin
   cfg = JSON.parse(File.read('zbx2git.json'), :symbolize_names => true)
 rescue Exception => e
-  puts "Error Loading config file: zbx2git.json : #{e.message}"
+  logger.warn "Error Loading config file: zbx2git.json : #{e.message}"
+  logger.debug "Trace: #{e.backtrace.inspect}"
   exit 1
 end
+
+
+logger.warn "Start Collecting of instances: #{cfg[:zabbix_cfg].map{|i| i[:inst] }.join(', ')}"
 
 ts_s = Time.now.to_i
 Parallel.each(cfg[:zabbix_cfg], in_threads: 5) { |zab_cfg|
@@ -96,7 +113,7 @@ Parallel.each(cfg[:zabbix_cfg], in_threads: 5) { |zab_cfg|
   begin
     ts_s = Time.now.to_i
     logger.warn "Start Collecting: #{zab_cfg[:inst]} - #{zab_cfg[:url]}"
-    zbx = ZabbixApi.connect(:url => zab_cfg[:url], :user => zab_cfg[:user], :password => zab_cfg[:password], :timeout => 5)
+    zbx = ZabbixApi.connect(:url => zab_cfg[:url], :user => zab_cfg[:user], :password => zab_cfg[:password], :timeout => 15)
 
     for exp_cfg in cfg[:export_cfg] do
       exportConfig(logger, zab_cfg[:inst], zbx, exp_cfg)
@@ -108,5 +125,5 @@ Parallel.each(cfg[:zabbix_cfg], in_threads: 5) { |zab_cfg|
     logger.debug "Trace: #{e.backtrace.inspect}"
   end
 }
-puts "Completed in #{secs2human(Time.now.to_i - ts_s)}"
+logger.warn "Completed in #{secs2human(Time.now.to_i - ts_s)}"
 
