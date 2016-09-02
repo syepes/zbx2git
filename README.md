@@ -16,6 +16,7 @@ A brief overview of how zbx2git works:
 
 ## CGit integration
 Take a look at [cgit_integration](https://github.com/syepes/zbx2git/blob/master/docs/cgit_integration.md)
+
 ![cgit_integration](https://raw.githubusercontent.com/syepes/zbx2git/master/docs/images/cgit_example.png)
 
 ## Contribute
