@@ -14,6 +14,7 @@ require 'parallel'
 require 'fileutils'
 require "zabbixapi"
 require 'git'
+require 'openssl'
 
 
 def secs2human(secs)
