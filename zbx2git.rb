@@ -29,7 +29,7 @@ end
 def exportConfig(logger, inst, zbx, cfg)
   begin
     ts_s = Time.now.to_i
-    path = "#{Dir.pwd()}/#{inst}/#{cfg[:type]}"
+    path = "#{Dir.pwd()}/repository/#{inst}/#{cfg[:type]}"
     logger.info "Start Exporting: #{cfg[:type]} (#{inst})"
 
     results = zbx.query(
@@ -101,7 +101,8 @@ end
 
 
 
-log = Logger.new("zbx2git.log", 'monthly')
+FileUtils.mkdir_p("#{Dir.pwd()}/logs") unless File.exists?("#{Dir.pwd()}/logs")
+log = Logger.new("logs/zbx2git.log", 'monthly')
 log.level = Logger::INFO
 
 begin
@@ -117,7 +118,7 @@ log.info "Start Collecting of instances: #{cfg[:zabbix_cfg].map{|i| i[:inst] }.j
 
 ts_s = Time.now.to_i
 Parallel.each(cfg[:zabbix_cfg], in_threads: 5) { |zab_cfg|
-  logger = Logger.new("zbx2git_#{zab_cfg[:inst]}.log", 'monthly')
+  logger = Logger.new("logs/zbx2git_#{zab_cfg[:inst]}.log", 'monthly')
   logger.level = Logger::INFO
 
   begin
