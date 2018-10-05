@@ -1,4 +1,4 @@
-#!/usr/bin/env jruby
+#!/usr/bin/env ruby
 #
 # DESCRIPTION:
 #   Exports your Zabbix configuration and uses Git to store any changes made from the previous runs
