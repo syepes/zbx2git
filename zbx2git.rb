@@ -16,6 +16,8 @@ require "zabbixapi"
 require 'git'
 require 'openssl'
 
+PATH_CURRENT = Dir.pwd()
+
 
 def secs2human(secs)
   [[60, :seconds], [60, :minutes], [24, :hours], [1000, :days]].map{|count, name|
@@ -29,7 +31,7 @@ end
 def exportConfig(logger, inst, zbx, cfg)
   begin
     ts_s = Time.now.to_i
-    path = "#{Dir.pwd()}/repository/#{inst}/#{cfg[:type]}"
+    path = "#{PATH_CURRENT}/repository/#{inst}/#{cfg[:type]}"
     logger.info "Start Exporting: #{cfg[:type]} (#{inst})"
 
     results = zbx.query(
@@ -100,9 +102,8 @@ end
 
 
 
-
-FileUtils.mkdir_p("#{Dir.pwd()}/logs") unless File.exists?("#{Dir.pwd()}/logs")
-log = Logger.new("logs/zbx2git.log", 'monthly')
+FileUtils.mkdir_p("#{PATH_CURRENT}/logs") unless File.exists?("#{PATH_CURRENT}/logs")
+log = Logger.new("#{PATH_CURRENT}/logs/zbx2git.log", 'monthly')
 log.level = Logger::INFO
 
 begin
@@ -117,8 +118,8 @@ end
 log.info "Start Collecting of instances: #{cfg[:zabbix_cfg].map{|i| i[:inst] }.join(', ')}"
 
 ts_s = Time.now.to_i
-Parallel.each(cfg[:zabbix_cfg], in_threads: 5) { |zab_cfg|
-  logger = Logger.new("logs/zbx2git_#{zab_cfg[:inst]}.log", 'monthly')
+Parallel.each(cfg[:zabbix_cfg], in_processes: 8) { |zab_cfg|
+  logger = Logger.new("#{PATH_CURRENT}/logs/zbx2git_#{zab_cfg[:inst]}.log", 'monthly')
   logger.level = Logger::INFO
 
   begin
