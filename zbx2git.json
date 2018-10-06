@@ -31,23 +31,23 @@
     {
       "type": "images",
       "method": "image.get",
-      "output": [ "imageids", "name" ],
-      "sortorder": "imageids",
-      "id": "imageids"
+      "output": [ "imageid", "name" ],
+      "sortorder": "imageid",
+      "id": "imageid"
     },
     {
       "type": "maps",
       "method": "map.get",
-      "output": [ "sysmapids", "name" ],
-      "sortorder": "sysmapids",
-      "id": "sysmapids"
+      "output": [ "sysmapid", "name" ],
+      "sortorder": "sysmapid",
+      "id": "sysmapid"
     },
     {
       "type": "screens",
       "method": "screen.get",
-      "output": [ "screenids", "name" ],
-      "sortorder": "screenids",
-      "id": "screenids"
+      "output": [ "screenid", "name" ],
+      "sortorder": "screenid",
+      "id": "screenid"
     }
   ],
   "zabbix_cfg": [
