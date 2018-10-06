@@ -10,7 +10,13 @@ A brief overview of how zbx2git works:
   - Individually saves the retrieved configurations locally
   - A Git Repository is created and maintained for each of the exported configurations objects
 
-## Requirements
+
+## Pre-build Docker images
+- https://hub.docker.com/r/syepes/zbx2git/
+- https://hub.docker.com/r/syepes/zbx2git-web/
+
+
+## Build Requirements
 - Ruby + Gems: parallel zabbixapi git
 - Git
 
@@ -28,7 +34,7 @@ zbx2git is distributed under the [Apache 2.0 License](http://www.apache.org/lice
 Copyright &copy; 2016, [Sebastian YEPES F.](mailto:syepes@gmail.com)
 
 ## Used open source projects
-[JRuby](http://jruby.org) |
+[Ruby](http://ruby-lang.org) |
 [Parallel](https://github.com/grosser/parallel) |
 [Zabbixapi](https://github.com/express42/zabbixapi) |
 [Git](https://git-scm.com/)
